@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>fc6bd608-3624-49dd-bc22-39dbf9260388</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>Happyview.py</StartupFile>
+    <StartupFile>happyview.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -22,7 +22,8 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Happyview.py" />
+    <Compile Include="happyview.py" />
+    <Compile Include="controls.py" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
