@@ -1,76 +1,103 @@
-﻿from PyQt5.QtCore import Qt
+﻿from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import (QBrush, QColor)
-from PyQt5.QtWidgets import QGraphicsWidget, QGraphicsLinearLayout
+from PyQt5.QtWidgets import (QWidget, QToolBar)
+
+class BaseControl(QToolBar):
+	def __init__(self, parent=None):
+		super().__init__(parent)
+		self.setIconSize(QSize(50, 50))
+		self.setAutoFillBackground(True)
+
+	@property
+	def halfWidth(self):
+		return self.width()//2
+
+	@property
+	def halfHeight(self):
+		return self.height()//2
 
 # Main Controls
 
-class FromFile(QGraphicsWidget):
+class FromFile(BaseControl):
 	"Load images from file"
-	pass
-
-class FromFolder(QGraphicsWidget):
-	"Load images from folder"
-	pass
-
-class ViewMode(QGraphicsWidget):
-	"View single image or 2 images like a book"
-	pass
-
-class ImageDirection(QGraphicsWidget):
-	"LeftToRight or RightToLeft"
-	pass
-
-class PlayDiasshow(QGraphicsWidget):
-	"Start diasshow"
-	pass
-
-class MainControls(QGraphicsWidget):
-	"Main controls for things like loading images, "
 	
 	def __init__(self, parent=None):
 		super().__init__(parent)
-		self._mainLayout = QGraphicsLinearLayout(Qt.Vertical, self)
+
+class FromFolder(BaseControl):
+	"Load images from folder"
+
+	def __init__(self, parent=None):
+		super().__init__(parent)
+
+class ViewMode(BaseControl):
+	"View single image or 2 images like a book"
+	
+	def __init__(self, parent=None):
+		super().__init__(parent)
+
+class ImageDirection(BaseControl):
+	"LeftToRight or RightToLeft"
+	
+	def __init__(self, parent=None):
+		super().__init__(parent)
+
+class PlayDiasshow(BaseControl):
+	"Start diasshow"
+	
+	def __init__(self, parent=None):
+		super().__init__(parent)
+
+class MainControls(BaseControl):
+	"Main controls for things like loading images, "
+	
+	def __init__(self, scene, parent=None):
+		super().__init__(parent)
+		self.setOrientation(Qt.Horizontal)
+		self._scene = scene
+		self._fromFile = self.addAction("From File")
+		self._fromFolder = self.addAction("From Folder")
 
 # ImageControls
 
-class ZoomIn(QGraphicsWidget):
+class ZoomIn(BaseControl):
 	"Zoom in"
 	pass
 
-class ZoomOut(QGraphicsWidget):
+class ZoomOut(BaseControl):
 	"Zoom out"
 	pass
 
-class RotateClockwise(QGraphicsWidget):
+class RotateClockwise(BaseControl):
 	"Rotate image clockwise"
 	pass
 
-class RotateCounterClockwise(QGraphicsWidget):
+class RotateCounterClockwise(BaseControl):
 	"Rotate image counter clockwise"
 	pass
 
-class ImageControls:
+class ImageControls(QToolBar):
 	"Image controls"
 
-	def __init__(self, parent=None):
+	def __init__(self, scene, parent=None):
 		super().__init__(parent)
 		self._mainLayout = QGraphicsLinearLayout(Qt.Horizontal, self)
 
 # NavControls
 
 
-class Forward(QGraphicsWidget):
+class Forward(BaseControl):
 	"Go to next image"
 	pass
 
-class Backward(QGraphicsWidget):
+class Backward(BaseControl):
 	"Go to previous image"
 	pass
 
-class NavControls:
+class NavControls(QToolBar):
 	"Navigation controls"
 
-	def __init__(self, parent=None):
+	def __init__(self, scene, parent=None):
 		super().__init__(parent)
 		self._mainLayout = QGraphicsLinearLayout(Qt.Horizontal, self)
 
