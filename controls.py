@@ -3,19 +3,18 @@
 from PyQt5.QtCore import Qt, QSize, QRect, QPoint, pyqtSignal, QObject
 from PyQt5.QtGui import (QBrush, QColor, QPainter, QPen, QBrush,
 						 QPolygon)
-from PyQt5.QtWidgets import (QToolBar, QPushButton)
+from PyQt5.QtWidgets import (QToolBar, QPushButton, QFileDialog)
 
 class Direction(Enum):
 	Forward = 0
 	Backward = 1
 
 class BaseControl(QToolBar):
-	def __init__(self, scene, parent=None):
+	def __init__(self, parent=None):
 		super().__init__(parent)
 		self.setOrientation(Qt.Horizontal)
 		self.setIconSize(QSize(50, 50))
 		self.setAutoFillBackground(True)
-		self._scene = scene
 
 	@property
 	def halfWidth(self):
@@ -26,50 +25,37 @@ class BaseControl(QToolBar):
 		return self.height() // 2
 
 # Main Controls
-class FromFile(BaseControl):
-	"Load images from file"
-	
-	def __init__(self, parent=None):
-		super().__init__(parent)
-
-class FromFolder(BaseControl):
-	"Load images from folder"
-
-	def __init__(self, parent=None):
-		super().__init__(parent)
-
-class ViewMode(BaseControl):
-	"View single image or 2 images like a book"
-	
-	def __init__(self, parent=None):
-		super().__init__(parent)
-
-class ImageDirection(BaseControl):
-	"LeftToRight or RightToLeft"
-	
-	def __init__(self, parent=None):
-		super().__init__(parent)
-
-class PlayDiasshow(BaseControl):
-	"Start diasshow"
-	
-	def __init__(self, parent=None):
-		super().__init__(parent)
 
 class MainControls(BaseControl):
-	"Main controls for things like loading images, "
+	"Main controls for changes general settings"
+	imagesSelected = pyqtSignal(list)
+	viewModeChanged = pyqtSignal()
+	imageDirectionChanged = pyqtSignal()
+	diasshowStateChanged = pyqtSignal()
 	
-	def __init__(self, scene, parent=None):
-		super().__init__(scene, parent)
-		self._fromFile = self.addAction("From File")
-		self._fromFolder = self.addAction("From Folder")
+	def __init__(self, supported_exts, parent=None):
+		super().__init__(parent)
+		self.supportedImages = supported_exts
+		self._fromFile = self.addAction("From File", self.chooseFile) # load images from file
+		self._fromFolder = self.addAction("From Folder", self.chooseFolder) # load images from folder
+		self._viewMode = self.addAction("View Mode", self.viewModeChanged.emit) # View single image or 2 images like a book
+		self._imgDirection = self.addAction("Image Direction", self.imageDirectionChanged.emit) # LeftToRight or RightToLeft
+		self._playDias = self.addAction("Play Diasshow", self.diasshowStateChanged.emit) # start diasshow
+
+	def chooseFolder(self):
+		pass
+
+	def chooseFile(self):
+		img = QFileDialog.getOpenFileName(self.parentWidget(), "Choose image", filter=self.supportedImages)
+		if img[0]: # if a file was chosen
+			self.imagesSelected.emit([img[0]])
 
 # ImageControls
 class ImageControls(BaseControl):
 	"Image controls"
 
-	def __init__(self, scene, parent=None):
-		super().__init__(scene, parent)
+	def __init__(self, parent=None):
+		super().__init__(parent)
 		self._zoomIn = self.addAction("Zoom In")
 		self._zoomOut = self.addAction("Zoom Out")
 		self._rotateCW = self.addAction("Rotate Right") # Clockwise
