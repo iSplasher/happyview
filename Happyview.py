@@ -10,6 +10,10 @@ class ReadingDirection(Enum):
 	LeftToRight = 0
 	RightToLeft = 1
 
+class ViewMode(Enum):
+	SingleView = 0
+	DoubleView = 1
+
 class ImageList(QObject):
 	"Represents and manages a list of images"
 	imagesLoaded = pyqtSignal(list)
@@ -19,7 +23,6 @@ class ImageList(QObject):
 		self._images = []
 		self._currentIdx = 0
 		self.preloadCount = 3 # amount of images to load at a time
-		self.dispatchImagesCount = 1 # amount of images to emit when requested
 
 	@property
 	def current(self):
@@ -28,14 +31,24 @@ class ImageList(QObject):
 
 	def loadNext(self):
 		""
-		pass
+		try:
+			self.imagesLoaded.emit(self._images[self._currentIdx])
+			self._currentIdx += 1
+		except IndexError:
+			self.imagesLoaded.emit([])
 
 	def loadPrev(self):
 		""
 		pass
 
 	def addImage(self, img_path):
-		pass
+		self._images.append(QPixmap(img_path))
+
+class ImageScene(QGraphicsScene):
+	""
+
+	def __init__(self, parent):
+		super().__init__(parent)
 
 class Happyview(QGraphicsView):
 	""
@@ -45,8 +58,9 @@ class Happyview(QGraphicsView):
 
 	def __init__(self):
 		super().__init__()
-		self._orientation = Qt.Vertical # which way to go for the next image
+		self._orientation = Qt.Horizontal # which way to go for the next image
 		self._readingDirection = ReadingDirection.LeftToRight
+		self._viewMode = ViewMode.SingleView
 		self._backgroundColor = "#404244"
 		self._backgroundBrush = QBrush(QColor(self._backgroundColor))
 
@@ -71,6 +85,7 @@ class Happyview(QGraphicsView):
 		self.setMinimumSize(100, 100)
 		self.setImageDirection(self._orientation)
 		self._imageThread.start()
+		self.resize(600, 500)
 
 	def forward(self):
 		"Show next image"
@@ -87,7 +102,7 @@ class Happyview(QGraphicsView):
 		"""
 		assert isinstance(sources, list)
 		for img in sources:
-			self.loadImages(img)
+			self.loadImages.emit(img)
 
 	def setImageDirection(self, ori):
 		"Change image direction"
@@ -96,13 +111,20 @@ class Happyview(QGraphicsView):
 		self._imageControls.setOrientation(ori)
 		self._navControls.changeOrientation(ori)
 
+	def toggleViewMode(self):
+		"Toggle view mode"
+		if self._viewMode == ViewMode.SingleView:
+			self._viewMode = ViewMode.DoubleView
+		else:
+			self._viewMode = ViewMode.SingleView
+
+
 	def setImage(self, pixmap_list):
+		""
 		assert isinstance(pixmap_list, list)
 		if pixmap_list:
 			assert isinstance(pixmap_list[0], QPixmap)
 			# calculate required rect
-			
-
 
 	def resizeEvent(self, ev):
 		# center controls
@@ -110,10 +132,10 @@ class Happyview(QGraphicsView):
 		if self._orientation == Qt.Horizontal:
 			self._mainControls.move(self.width()//2-self._mainControls.halfWidth, 0)
 			self._imageControls.move(self.width()//2-self._imageControls.halfWidth,
-							self.height()-self._imageControls.height()-self.horizontalScrollBar().height())
+							self.height()-self._imageControls.height()//2-self.horizontalScrollBar().height())
 		else:
 			self._mainControls.move(0, self.height()//2-self._mainControls.halfHeight)
-			self._imageControls.move(self.width()-self._imageControls.width()-self.verticalScrollBar().width(),
+			self._imageControls.move(self.width()-self._imageControls.width(),
 						   self.height()//2-self._imageControls.halfHeight)
 
 		return super().resizeEvent(ev)

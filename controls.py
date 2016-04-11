@@ -69,8 +69,8 @@ class NavControl(QPushButton):
 		super().__init__(parent)
 		self._direction = direction
 		self._orientation = orientation
-		self._thickness = 10
-		self.resize(50, 50) # default size
+		self._thickness = 15
+		self.resize(35, 35) # default size
 
 	def paintEvent(self, ev):
 
@@ -80,8 +80,14 @@ class NavControl(QPushButton):
 		x, y, w, h = rect.getRect()
 		painter = QPainter(self)
 		painter.setRenderHint(painter.Antialiasing)
-		painter.setPen(QPen(Qt.red))
-		painter.setBrush(QBrush(Qt.white))
+		if self.underMouse():
+			penColor = QColor(255, 255, 255, 200)
+			brushColor = QColor(240, 240, 240, 200)
+		else:
+			penColor = QColor(255, 255, 255, 100)
+			brushColor = QColor(240, 240, 240, 100)
+		painter.setPen(QPen(penColor))
+		painter.setBrush(QBrush(brushColor))
 
 		# figure out the arrow points.
 		arrowPoints = []
@@ -90,9 +96,9 @@ class NavControl(QPushButton):
 			if self._orientation == Qt.Horizontal:
 				arrowPoints.extend(
 					[QPoint(x + w, y),
-					QPoint(x + w - self._thickness, y),
+					#QPoint(x + w - self._thickness, y),
 					QPoint(x, y + h // 2),
-					QPoint(x + w - self._thickness, y + h),
+					#QPoint(x + w - self._thickness, y + h),
 					QPoint(x + w, y + h),
 					QPoint(x + self._thickness, y + h // 2),
 					QPoint(x + w, y)])
@@ -101,27 +107,27 @@ class NavControl(QPushButton):
 					[QPoint(x, y + h),
 					QPoint(x + w // 2, y),
 					QPoint(x + w, y + h),
-					QPoint(x + w - self._thickness, y + h),
+					#QPoint(x + w - self._thickness, y + h),
 					QPoint(x + w // 2, y + self._thickness),
-					QPoint(x + self._thickness, y + h),
+					#QPoint(x + self._thickness, y + h),
 					QPoint(x, y + h)])
 
 		else:
 			if self._orientation == Qt.Horizontal:
 				arrowPoints.extend(
 					[QPoint(x, y),
-					QPoint(x + self._thickness, y),
+					#QPoint(x + self._thickness, y),
 					QPoint(x + w, y + h // 2),
-					QPoint(x + self._thickness, y + h),
+					#QPoint(x + self._thickness, y + h),
 					QPoint(x, y + h),
 					QPoint(x + w - self._thickness, y + h // 2),
 					QPoint(x, y)])
 			else:
 				arrowPoints.extend(
 					[QPoint(x, y),
-					QPoint(x + self._thickness, y),
+					#QPoint(x + self._thickness, y),
 					QPoint(x + w//2, y + h - self._thickness),
-					QPoint(x + w - self._thickness, y),
+					#QPoint(x + w - self._thickness, y),
 					QPoint(x + w, y),
 					QPoint(x + w//2, y + h),
 					QPoint(x, y)])
@@ -154,6 +160,7 @@ class NavControls(QObject):
 	def ensureEgdes(self):
 		"Makes sure the nav controls stays at the edges and has the right size"
 		if self._orientation == Qt.Horizontal:
+            # ensure positioning
 			_margin = self._view.verticalScrollBar().width()
 			self._forward.move(self._view.width() - self._forward.width() - _margin - 5,
 				self._view.height() // 2 - self._forward.height() // 2)
@@ -162,10 +169,11 @@ class NavControls(QObject):
 				self._view.height() // 2 - self._backward.height() // 2)
 
 			# ensure relative size
-			h = self._view.height() * 0.2
-			w = h * 0.4
+			h = self._view.height() * 0.12
+			w = h * 0.3
 
 		else:
+            # ensure positioning
 			_margin = self._view.horizontalScrollBar().height()
 			self._forward.move(self._view.width() // 2 - self._forward.width() // 2,
 				self._view.height() - self._forward.height() - _margin - 5)
@@ -174,8 +182,8 @@ class NavControls(QObject):
 				_margin)
 
 			# ensure relative size
-			w = self._view.width() * 0.15
-			h = w * 0.25
+			w = self._view.width() * 0.12
+			h = w * 0.3
 
 		self._forward.resize(w, h)
 		self._backward.resize(w, h)
