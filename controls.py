@@ -3,7 +3,7 @@
 from PyQt5.QtCore import Qt, QSize, QRect, QPoint, pyqtSignal, QObject
 from PyQt5.QtGui import (QBrush, QColor, QPainter, QPen, QBrush,
 						 QPolygon)
-from PyQt5.QtWidgets import (QToolBar, QPushButton, QFileDialog)
+from PyQt5.QtWidgets import (QToolBar, QPushButton, QFileDialog, QSpacerItem)
 
 class Direction(Enum):
 	Forward = 0
@@ -16,6 +16,14 @@ class BaseControl(QToolBar):
 		self.setIconSize(QSize(50, 50))
 		self.setAutoFillBackground(True)
 
+		self.setStyleSheet(self.styleSheet()+
+					 """
+					 background-color: rgba(0, 0, 0, 0.2);
+					 """)
+
+	def centerToolActions(self):
+		""
+		pass
 	@property
 	def halfWidth(self):
 		return self.width() // 2
@@ -160,9 +168,9 @@ class NavControls(QObject):
 	def ensureEgdes(self):
 		"Makes sure the nav controls stays at the edges and has the right size"
 		if self._orientation == Qt.Horizontal:
-            # ensure positioning
-			_margin = self._view.verticalScrollBar().width()
-			self._forward.move(self._view.width() - self._forward.width() - _margin - 5,
+			# ensure positioning
+			_margin = self._view.verticalScrollBar().width()//2
+			self._forward.move(self._view.width() - self._forward.width() - _margin,
 				self._view.height() // 2 - self._forward.height() // 2)
 
 			self._backward.move(_margin,
@@ -173,8 +181,8 @@ class NavControls(QObject):
 			w = h * 0.3
 
 		else:
-            # ensure positioning
-			_margin = self._view.horizontalScrollBar().height()
+			# ensure positioning
+			_margin = self._view.horizontalScrollBar().height()//2
 			self._forward.move(self._view.width() // 2 - self._forward.width() // 2,
 				self._view.height() - self._forward.height() - _margin - 5)
 
