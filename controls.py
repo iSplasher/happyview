@@ -54,9 +54,9 @@ class MainControls(BaseControl):
 		pass
 
 	def chooseFile(self):
-		img = QFileDialog.getOpenFileName(self.parentWidget(), "Choose image", filter=self.supportedImages)
+		img = QFileDialog.getOpenFileNames(self.parentWidget(), "Select image", filter=self.supportedImages)
 		if img[0]: # if a file was chosen
-			self.imagesSelected.emit([img[0]])
+			self.imagesSelected.emit(img[0])
 
 # ImageControls
 class ImageControls(BaseControl):
