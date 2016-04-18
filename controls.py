@@ -2,8 +2,11 @@
 
 from PyQt5.QtCore import Qt, QSize, QRect, QPoint, pyqtSignal, QObject
 from PyQt5.QtGui import (QBrush, QColor, QPainter, QPen, QBrush,
-						 QPolygon)
-from PyQt5.QtWidgets import (QToolBar, QPushButton, QFileDialog, QSpacerItem)
+						 QPolygon, QIcon)
+from PyQt5.QtWidgets import (QToolBar, QPushButton, QFileDialog, QWidget,
+							 QSizePolicy)
+
+import zipfile, os
 
 class Direction(Enum):
 	Forward = 0
@@ -18,7 +21,7 @@ class BaseControl(QToolBar):
 
 		self.setStyleSheet(self.styleSheet()+
 					 """
-					 background-color: rgba(0, 0, 0, 0.2);
+					 background-color: rgba(255, 255, 255, 0.4);
 					 """)
 
 	def centerToolActions(self):
@@ -43,31 +46,42 @@ class MainControls(BaseControl):
 	
 	def __init__(self, supported_exts, parent=None):
 		super().__init__(parent)
+		# a dummy widget to center actions
+		spacer1 = QWidget()
+		spacer1.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+		self.addWidget(spacer1)
+
 		self.supportedImages = supported_exts
-		self._fromFile = self.addAction("From File", self.chooseFile) # load images from file
-		self._fromFolder = self.addAction("From Folder", self.chooseFolder) # load images from folder
-		self._viewMode = self.addAction("View Mode", self.viewModeChanged.emit) # View single image or 2 images like a book
-		self._imgDirection = self.addAction("Image Direction", self.imageDirectionChanged.emit) # LeftToRight or RightToLeft
-		self._playDias = self.addAction("Play Diasshow", self.diasshowStateChanged.emit) # start diasshow
+		self._fromFile = self.addAction(QIcon("icons/image-outline.svg"), "", self.chooseFile) # load images from file
+		self._fromFolder = self.addAction(QIcon("icons/folder-open.svg"), "", self.chooseFolder) # load images from folder
+		self._viewMode = self.addAction(QIcon("icons/eye-outline.svg"), "", self.viewModeChanged.emit) # View single image or 2 images like a book
+		self._imgDirection = self.addAction(QIcon("icons/arrow-move-outline.svg"), "", self.imageDirectionChanged.emit) # LeftToRight or RightToLeft
+		self._playDias = self.addAction(QIcon("icons/media-play-outline.svg"), "", self.diasshowStateChanged.emit) # start diasshow
+		self._zoomIn = self.addAction(QIcon("icons/zoom-in-outline.svg"), "")
+		self._zoomOut = self.addAction(QIcon("icons/zoom-out-outline.svg"), "")
+		self._rotateCW = self.addAction(QIcon("icons/rotate-cw-outline.svg"), "") # Clockwise
+		#self._rotateCCW = self.addAction("Rotate Left") # Counter clockwise
+
+		# a dummy widget to center actions
+		spacer2 = QWidget()
+		spacer2.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+		self.addWidget(spacer2)
 
 	def chooseFolder(self):
-		pass
+		folder = QFileDialog.getExistingDirectory(self.parentWidget(), "Choose folder")
+		if folder:
+			self.imagesSelected.emit(
+				[os.path.join(folder, x) for x in os.listdir(folder) if x.endswith((".jpg", ".png", ".zip", ".cbz"))])
 
 	def chooseFile(self):
-		img = QFileDialog.getOpenFileNames(self.parentWidget(), "Select image", filter=self.supportedImages)
-		if img[0]: # if a file was chosen
+		files, _ = QFileDialog.getOpenFileNames(self.parentWidget(), "Select image", filter=self.supportedImages)
+		if files: # if a file was chosen
+			images = []
+			for f in files:
+				if f.endswith((".zip", ".cbz")):
+					continue
+				images.append(f)
 			self.imagesSelected.emit(img[0])
-
-# ImageControls
-class ImageControls(BaseControl):
-	"Image controls"
-
-	def __init__(self, parent=None):
-		super().__init__(parent)
-		self._zoomIn = self.addAction("Zoom In")
-		self._zoomOut = self.addAction("Zoom Out")
-		self._rotateCW = self.addAction("Rotate Right") # Clockwise
-		self._rotateCCW = self.addAction("Rotate Left") # Counter clockwise
 
 # NavControls
 class NavControl(QPushButton):
@@ -89,10 +103,10 @@ class NavControl(QPushButton):
 		painter = QPainter(self)
 		painter.setRenderHint(painter.Antialiasing)
 		if self.underMouse():
-			penColor = QColor(255, 255, 255, 200)
+			penColor = QColor(0,0,0)
 			brushColor = QColor(240, 240, 240, 200)
 		else:
-			penColor = QColor(255, 255, 255, 100)
+			penColor = QColor(0,0,0)
 			brushColor = QColor(240, 240, 240, 100)
 		painter.setPen(QPen(penColor))
 		painter.setBrush(QBrush(brushColor))
@@ -152,7 +166,7 @@ class NavControls(QObject):
 
 	def __init__(self, view, orientation=Qt.Vertical):
 		super().__init__(view)
-		self._view = view
+		self._view = view.viewport()
 		self._orientation = orientation
 		self._forward = NavControl(Direction.Forward, orientation, view) # Go to next image
 		self._forward.clicked.connect(self.forwardClicked.emit)
@@ -169,7 +183,7 @@ class NavControls(QObject):
 		"Makes sure the nav controls stays at the edges and has the right size"
 		if self._orientation == Qt.Horizontal:
 			# ensure positioning
-			_margin = self._view.verticalScrollBar().width()//2
+			_margin = 15
 			self._forward.move(self._view.width() - self._forward.width() - _margin,
 				self._view.height() // 2 - self._forward.height() // 2)
 
@@ -178,20 +192,20 @@ class NavControls(QObject):
 
 			# ensure relative size
 			h = self._view.height() * 0.12
-			w = h * 0.3
+			w = h * 0.4
 
 		else:
 			# ensure positioning
-			_margin = self._view.horizontalScrollBar().height()//2
+			_margin = 10
 			self._forward.move(self._view.width() // 2 - self._forward.width() // 2,
-				self._view.height() - self._forward.height() - _margin - 5)
+				self._view.height() - self._forward.height() - _margin)
 
 			self._backward.move(self._view.width() // 2 - self._backward.width() // 2,
 				_margin)
 
 			# ensure relative size
 			w = self._view.width() * 0.12
-			h = w * 0.3
+			h = w * 0.4
 
 		self._forward.resize(w, h)
 		self._backward.resize(w, h)

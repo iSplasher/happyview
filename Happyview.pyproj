@@ -24,6 +24,9 @@
   <ItemGroup>
     <Compile Include="happyview.py" />
     <Compile Include="controls.py" />
+    <Compile Include="viewer.py">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
