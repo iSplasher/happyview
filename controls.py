@@ -43,9 +43,14 @@ class MainControls(BaseControl):
 	viewModeChanged = pyqtSignal()
 	imageDirectionChanged = pyqtSignal()
 	diasshowStateChanged = pyqtSignal()
+	zoomChanged = pyqtSignal(bool)
+	rotateChanged = pyqtSignal()
 	
 	def __init__(self, supported_exts, parent=None):
 		super().__init__(parent)
+
+		self._diasshowRunning = False
+
 		# a dummy widget to center actions
 		spacer1 = QWidget()
 		spacer1.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
@@ -56,10 +61,10 @@ class MainControls(BaseControl):
 		self._fromFolder = self.addAction(QIcon("icons/folder-open.svg"), "", self.chooseFolder) # load images from folder
 		self._viewMode = self.addAction(QIcon("icons/eye-outline.svg"), "", self.viewModeChanged.emit) # View single image or 2 images like a book
 		self._imgDirection = self.addAction(QIcon("icons/arrow-move-outline.svg"), "", self.imageDirectionChanged.emit) # Horizontal or Vertical
-		self._playDias = self.addAction(QIcon("icons/media-play-outline.svg"), "", self.diasshowStateChanged.emit) # start diasshow
-		self._zoomIn = self.addAction(QIcon("icons/zoom-in-outline.svg"), "")
-		self._zoomOut = self.addAction(QIcon("icons/zoom-out-outline.svg"), "")
-		self._rotateCW = self.addAction(QIcon("icons/rotate-cw-outline.svg"), "") # Clockwise
+		self._playDias = self.addAction(QIcon("icons/media-play-outline.svg"), "", self.diasshowState) # start diasshow
+		self._zoomIn = self.addAction(QIcon("icons/zoom-in-outline.svg"), "", lambda: self.zoomChanged.emit(True))
+		self._zoomOut = self.addAction(QIcon("icons/zoom-out-outline.svg"), "", lambda: self.zoomChanged.emit(False))
+		self._rotateCW = self.addAction(QIcon("icons/rotate-cw-outline.svg"), "", self.rotateChanged.emit) # Clockwise
 		#self._rotateCCW = self.addAction("Rotate Left") # Counter clockwise
 
 		# a dummy widget to center actions
@@ -91,6 +96,17 @@ class MainControls(BaseControl):
 			self.resize(pSize.width(), self.iconSize().height()//2)
 		else:
 			self.resize(self.iconSize().width()//2, pSize.height())
+
+	def diasshowState(self):
+		"Changes the diasshow icon and emits signal"
+		if self._diasshowRunning:
+			i = "icons/media-play-outline.svg"
+			self._diasshowRunning = False
+		else:
+			i = "icons/media-pause-outline.svg"
+			self._diasshowRunning = True
+		self._playDias.setIcon(QIcon(i))
+		self.diasshowStateChanged.emit()
 
 # NavControls
 class NavControl(QPushButton):

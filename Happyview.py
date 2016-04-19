@@ -1,13 +1,14 @@
 from enum import Enum
 
 from PyQt5.QtCore import (Qt, QRectF, QObject, pyqtSignal, QThread,
-						  QPointF, QSizeF, QTimeLine, QPoint)
+						  QPointF, QSizeF, QTimeLine, QPoint, QTimer)
 from PyQt5.QtGui import (QBrush, QColor, QPixmap, QPainter, QTransform, QCursor)
 from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsLayoutItem,
 							 QGraphicsItem, QGraphicsLinearLayout, QGraphicsWidget,
-							 QGraphicsPixmapItem )
+							 QGraphicsPixmapItem)
 
 import controls
+import math
 
 class ReadingDirection(Enum):
 	LeftToRight = 0
@@ -93,10 +94,15 @@ class Happyview(QGraphicsView):
 		self._backgroundBrush = QBrush(QColor(self._backgroundColor))
 
 		# for zooming animation
-		self._numScheduledScalings = 0
+		self._scalingFactor = 0.09
+
+		# for rotate animation
+		self._rotateAngleFactor = 2 # vinkel i grader
 
 		# to determine if we should pan the image or move the window
 		self._canPan = True
+		# current zooming direction
+		self._zoomIn = True
 
 		self._mainScene = QGraphicsScene(self)
 		self._mainScene.setBackgroundBrush(self._backgroundBrush)
@@ -105,17 +111,35 @@ class Happyview(QGraphicsView):
 		self._mainControls = controls.MainControls("*.jpg *.png *.zip *.cbz", self)
 		self._navControls = controls.NavControls(self)
 
-		self._mainControls.imagesSelected.connect(self.load)
-		self._mainControls.imageDirectionChanged.connect(self.toggleDirection)
-		self._navControls.forwardClicked.connect(self.requestNext)
-		self._navControls.backwardClicked.connect(self.requestPrev)
-
 		self._currentGallery = None
 		self._currentPixmap = None
 
-		# animation
+		# animations
 		self._imageAnimation = QTimeLine(500, self)
 		self._imageAnimation.frameChanged.connect(self._moveTo)
+
+		self._zoomAnimation = QTimeLine(200, self)
+		self._zoomAnimation.setFrameRange(0, 10)
+		self._zoomAnimation.frameChanged.connect(self._doZoom)
+
+		self._rotationAnimation = QTimeLine(200, self)
+		self._rotationAnimation.setFrameRange(0, 10)
+		self._rotationAnimation.frameChanged.connect(self._doRotate)
+
+		self._diasshowInterval = 2 # in seconds
+		self._diasshowTimer = QTimer(self)
+		self._diasshowTimer.timeout.connect(self.requestNext)
+
+		# connect the main actions signals
+		self._mainControls.imagesSelected.connect(self.load)
+		self._mainControls.imageDirectionChanged.connect(self.toggleDirection)
+		self._mainControls.zoomChanged.connect(self._startZoom)
+		self._mainControls.rotateChanged.connect(self._rotationAnimation.start)
+		self._mainControls.diasshowStateChanged.connect(self.toggleDiasshow)
+
+		# connect the nav arrows
+		self._navControls.forwardClicked.connect(self.requestNext)
+		self._navControls.backwardClicked.connect(self.requestPrev)
 
 		self.setScene(self._mainScene)
 		self.setMinimumSize(100, 100)
@@ -211,6 +235,10 @@ class Happyview(QGraphicsView):
 		self._currentGallery = g
 		self.requestNext()
 
+	def setScalingFactor(self, f):
+		""
+		self._scalingFactor = f
+
 	def toggleDirection(self):
 		"Change image direction"
 		if self._orientation == Qt.Vertical:
@@ -223,6 +251,13 @@ class Happyview(QGraphicsView):
 		self._navControls.ensureEgdes()
 		
 		self._orientation = ori
+
+	def toggleDiasshow(self):
+		"Play or Pause the diasshow"
+		if self._diasshowTimer.isActive():
+			self._diasshowTimer.stop()
+		else:
+			self._diasshowTimer.start(self._diasshowInterval*1000)
 
 	def setImageMode(self, mode):
 		""
@@ -247,30 +282,43 @@ class Happyview(QGraphicsView):
 		super().resizeEvent(ev)
 
 	def wheelEvent(self, ev):
-		degrees = ev.angleDelta().y() / 8
-		steps = degrees / 15
-		self._numScheduledScalings += steps
-		# if user moved the wheel in another direction we reset shechuled scalings
-		if self._numScheduledScalings * steps < 0:
-			self._numScheduledScalings = steps
-
-		anim = QTimeLine(350, self)
-		anim.setUpdateInterval(10)
-
-		anim.valueChanged.connect(self.scalingTime)
-		anim.finished.connect(self.zoomFinished)
-		anim.start()
 		super().wheelEvent(ev)
 
-	def scalingTime(self, x):
-		factor = 1 + self._numScheduledScalings / 300
-		self.scale(factor, factor)
+	def _startZoom(self, _in):
+		""
+		self._zoomIn = _in
+		if self._zoomAnimation.Running:
+			self._zoomAnimation.stop()
+		self._zoomAnimation.start()
 
-	def zoomFinished(self):
-		if self._numScheduledScalings > 0:
-			self._numScheduledScalings -= 1
+	def _doZoom(self):
+		""
+		self.setTransformationAnchor(self.AnchorViewCenter)
+		if self._zoomIn:
+			zoomScale = 1+self._scalingFactor
 		else:
-			self._numScheduledScalings += 1
+			zoomScale = 1-self._scalingFactor
+		self.scale(zoomScale, zoomScale)
+
+	def _doRotate(self):
+		"Rotere vores billede"
+		self.setTransformationAnchor(self.NoAnchor)
+		# grader til radianer
+		radians = (self._rotateAngleFactor/360)*2*math.pi
+
+		# rotations matrice
+		# [cos, -sin, 0]
+		# [sin,  cos, 0]
+		# [0,    0,   1]
+
+		matrix = QTransform(
+			math.cos(radians), math.sin(radians), 0,
+			-math.sin(radians), math.cos(radians), 0,
+			0, 0, 1)
+
+		# vi ganger på den nuværende matrice
+		matrix = self.transform()*matrix
+		self.setTransform(matrix)
 
 	def mousePressEvent(self, ev):
 		if ev.button() == Qt.LeftButton:
