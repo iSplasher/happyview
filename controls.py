@@ -55,7 +55,7 @@ class MainControls(BaseControl):
 		self._fromFile = self.addAction(QIcon("icons/image-outline.svg"), "", self.chooseFile) # load images from file
 		self._fromFolder = self.addAction(QIcon("icons/folder-open.svg"), "", self.chooseFolder) # load images from folder
 		self._viewMode = self.addAction(QIcon("icons/eye-outline.svg"), "", self.viewModeChanged.emit) # View single image or 2 images like a book
-		self._imgDirection = self.addAction(QIcon("icons/arrow-move-outline.svg"), "", self.imageDirectionChanged.emit) # LeftToRight or RightToLeft
+		self._imgDirection = self.addAction(QIcon("icons/arrow-move-outline.svg"), "", self.imageDirectionChanged.emit) # Horizontal or Vertical
 		self._playDias = self.addAction(QIcon("icons/media-play-outline.svg"), "", self.diasshowStateChanged.emit) # start diasshow
 		self._zoomIn = self.addAction(QIcon("icons/zoom-in-outline.svg"), "")
 		self._zoomOut = self.addAction(QIcon("icons/zoom-out-outline.svg"), "")
@@ -81,7 +81,16 @@ class MainControls(BaseControl):
 				if f.endswith((".zip", ".cbz")):
 					continue
 				images.append(f)
-			self.imagesSelected.emit(img[0])
+			self.imagesSelected.emit(images)
+
+	def ensureDirection(self, ori):
+		""
+		self.move(0, 0)
+		pSize = self.parentWidget().size()
+		if ori == Qt.Horizontal:
+			self.resize(pSize.width(), self.iconSize().height()//2)
+		else:
+			self.resize(self.iconSize().width()//2, pSize.height())
 
 # NavControls
 class NavControl(QPushButton):

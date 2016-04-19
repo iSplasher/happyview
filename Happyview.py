@@ -1,7 +1,7 @@
 from enum import Enum
 
 from PyQt5.QtCore import (Qt, QRectF, QObject, pyqtSignal, QThread,
-						  QPointF, QSizeF, QTimeLine)
+						  QPointF, QSizeF, QTimeLine, QPoint)
 from PyQt5.QtGui import (QBrush, QColor, QPixmap, QPainter, QTransform, QCursor)
 from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsLayoutItem,
 							 QGraphicsItem, QGraphicsLinearLayout, QGraphicsWidget,
@@ -92,6 +92,12 @@ class Happyview(QGraphicsView):
 		self._backgroundColor = "#404244"
 		self._backgroundBrush = QBrush(QColor(self._backgroundColor))
 
+		# for zooming animation
+		self._numScheduledScalings = 0
+
+		# to determine if we should pan the image or move the window
+		self._canPan = True
+
 		self._mainScene = QGraphicsScene(self)
 		self._mainScene.setBackgroundBrush(self._backgroundBrush)
 
@@ -100,6 +106,7 @@ class Happyview(QGraphicsView):
 		self._navControls = controls.NavControls(self)
 
 		self._mainControls.imagesSelected.connect(self.load)
+		self._mainControls.imageDirectionChanged.connect(self.toggleDirection)
 		self._navControls.forwardClicked.connect(self.requestNext)
 		self._navControls.backwardClicked.connect(self.requestPrev)
 
@@ -112,8 +119,12 @@ class Happyview(QGraphicsView):
 
 		self.setScene(self._mainScene)
 		self.setMinimumSize(100, 100)
-		self.setImageDirection(self._orientation)
 		self.setImageMode(ImageMode.FitWidth)
+		self.toggleDirection()
+		self.resize(1000, 600)
+		self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+		self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+		self._navControls.ensureEgdes()
 
 	def requestNext(self):
 		""
@@ -200,11 +211,18 @@ class Happyview(QGraphicsView):
 		self._currentGallery = g
 		self.requestNext()
 
-	def setImageDirection(self, ori):
+	def toggleDirection(self):
 		"Change image direction"
-		self._orientation = ori
+		if self._orientation == Qt.Vertical:
+			ori = Qt.Horizontal
+		else:
+			ori = Qt.Vertical
 		self._mainControls.setOrientation(ori)
 		self._navControls.changeOrientation(ori)
+		self._mainControls.ensureDirection(ori)
+		self._navControls.ensureEgdes()
+		
+		self._orientation = ori
 
 	def setImageMode(self, mode):
 		""
@@ -224,14 +242,47 @@ class Happyview(QGraphicsView):
 	def resizeEvent(self, ev):
 		# center controls
 		self._navControls.ensureEgdes()
-		self._mainControls.move(0, 0)
-		if self._orientation == Qt.Horizontal:
-			self._mainControls.resize(ev.size().width(), self._mainControls.iconSize().height()//2)
-		else:
-			self._mainControls.resize(self._mainControls.iconSize().width()//2, ev.size().height())
+		self._mainControls.ensureDirection(self._orientation)
 
 		super().resizeEvent(ev)
 
+	def wheelEvent(self, ev):
+		degrees = ev.angleDelta().y() / 8
+		steps = degrees / 15
+		self._numScheduledScalings += steps
+		# if user moved the wheel in another direction we reset shechuled scalings
+		if self._numScheduledScalings * steps < 0:
+			self._numScheduledScalings = steps
+
+		anim = QTimeLine(350, self)
+		anim.setUpdateInterval(10)
+
+		anim.valueChanged.connect(self.scalingTime)
+		anim.finished.connect(self.zoomFinished)
+		anim.start()
+		super().wheelEvent(ev)
+
+	def scalingTime(self, x):
+		factor = 1 + self._numScheduledScalings / 300
+		self.scale(factor, factor)
+
+	def zoomFinished(self):
+		if self._numScheduledScalings > 0:
+			self._numScheduledScalings -= 1
+		else:
+			self._numScheduledScalings += 1
+
+	def mousePressEvent(self, ev):
+		if ev.button() == Qt.LeftButton:
+			if self._canPan:
+				self.setDragMode(self.ScrollHandDrag)
+		super().mousePressEvent(ev)
+
+	def mouseReleaseEvent(self, ev):
+		if ev.button() == Qt.LeftButton:
+			if self._canPan:
+				self.setDragMode(self.NoDrag)
+		super().mouseReleaseEvent(ev)
 
 if __name__ == '__main__':
 	from PyQt5.QtWidgets import QApplication
@@ -240,7 +291,6 @@ if __name__ == '__main__':
 	app = QApplication(sys.argv)
 	view = Happyview()
 	view.setWindowTitle("Happyview")
-	view.resize(1000, 600)
 	view.show()
 
 	sys.exit(app.exec())
