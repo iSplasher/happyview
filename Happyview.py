@@ -1,11 +1,11 @@
-from enum import Enum
+from enum import Enum, IntEnum
 
 from PyQt5.QtCore import (Qt, QRectF, QObject, pyqtSignal, QThread,
-						  QPointF, QSizeF, QTimeLine, QPoint, QTimer)
+						  QPointF, QSizeF, QTimeLine, QPoint, QTimer, QEvent)
 from PyQt5.QtGui import (QBrush, QColor, QPixmap, QPainter, QTransform, QCursor)
 from PyQt5.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsLayoutItem,
 							 QGraphicsItem, QGraphicsLinearLayout, QGraphicsWidget,
-							 QGraphicsPixmapItem)
+							 QGraphicsPixmapItem, QPinchGesture)
 
 import controls
 import math
@@ -18,67 +18,78 @@ class ViewMode(Enum):
 	SingleView = 0
 	DoubleView = 1
 
-class ImageMode(Enum):
-	FitInView = 0
-	FitWidth = 1
-	FitHeight = 2
-	NativeSize = 3
+class ImageMode(IntEnum):
+	NativeSize = 0
+	FitInView = 1
+	FitWidth = 2
+	FitHeight = 3
 
 class Gallery(QObject):
-	"Represents and manages a list of images"
-	imageLoaded = pyqtSignal(list)
+	"""Represents and manages a list of images
+
+	When next or previous are loaded <ImageLoaded> signal is emitted with the item
+	"""
+	imageLoaded = pyqtSignal(object)
 
 	def __init__(self):
 		super().__init__()
 
 		self._images = []
 		self._currentIdx = -1
-		self._loaded = False
-
+		self._loadCount = 2 # amount of images to keep loaded
 
 	def first(self):
-		""
+		"Loads first image"
 		if self._images:
-			return self._images[0]
+			self._currentIdx = 0
+			self.imageLoaded.emit(self._getImage(self._currentIdx))
 
 	def last(self):
+		"Loads last image"
 		if self._images:
-			return self._images[len(self._images)-1]
-
-	def currentImage(self):
-		""
-		try:
-			return self._images[self._currentIdx]
-		except IndexError:
-			return None
+			self._currentIdx = len(self._images)-1
+			self.imageLoaded.emit(self._getImage(self._currentIdx))
 
 	def prevImage(self):
-		""
-		try:
-			img = self._images[self._currentIdx-1]
-			self._currentIdx -= 1
-			return img
-		except IndexError:
-			return None
+		"Loads prev image"
+		nextIdx = max(0, self._currentIdx-1) # to avoid going below 0
+		img = self._getImage(nextIdx)
+		if img:
+			self._currentIdx = nextIdx
+			self.imageLoaded.emit(img)
 
 	def nextImage(self):
-		""
-		try:
-			img = self._images[self._currentIdx+1]
+		"Loads next image"
+		img = self._getImage(self._currentIdx+1)
+		if img:
 			self._currentIdx += 1
-			return img
+			self.imageLoaded.emit(img)
+
+	def _getImage(self, idx):
+		"Returns images in an efficient way"
+		try:
+			img = self._images[idx]
+			# save item if for future use
+			if not isinstance(img, tuple):
+				i = QGraphicsPixmapItem(QPixmap(img))
+				i.setTransformationMode(Qt.SmoothTransformation)
+				self._images[idx] = (i, img,)
+				img = self._images[idx]
+
+			# only keep x amounts of items loaded by unloading everything before
+			try:
+				prevItem = self._images[idx-self._loadCount]
+				if isinstance(prevItem, tuple):
+					self._images[idx-self._loadCount] = prevItem[1]
+			except IndexError:
+				pass
+
+			return img[0]
 		except IndexError:
 			return None
 
 	def addImages(self, paths):
-		for img in paths:
-			i = QGraphicsPixmapItem(QPixmap(img))
-			i.setTransformationMode(Qt.SmoothTransformation)
-			self._images.append(i)
-
-	def setOrientation(self, ori):
-		""
-		self._layout.setOrientation(ori)
+		self._images.extend(paths)
 
 class Happyview(QGraphicsView):
 	""
@@ -86,6 +97,7 @@ class Happyview(QGraphicsView):
 	def __init__(self):
 		super().__init__()
 		self.setViewportMargins(0, 0, 0, 0)
+		self.setMouseTracking(True) # we need to know where the mouse is
 		self._orientation = Qt.Vertical # which way to go for the next image
 		self._readingDirection = ReadingDirection.LeftToRight
 		self._imageMode = None
@@ -112,12 +124,9 @@ class Happyview(QGraphicsView):
 		self._navControls = controls.NavControls(self)
 
 		self._currentGallery = None
-		self._currentPixmap = None
+		self._currentPixmapItem = None
 
 		# animations
-		self._imageAnimation = QTimeLine(500, self)
-		self._imageAnimation.frameChanged.connect(self._moveTo)
-
 		self._zoomAnimation = QTimeLine(200, self)
 		self._zoomAnimation.setFrameRange(0, 10)
 		self._zoomAnimation.frameChanged.connect(self._doZoom)
@@ -126,7 +135,6 @@ class Happyview(QGraphicsView):
 		self._rotationAnimation.setFrameRange(0, 10)
 		self._rotationAnimation.frameChanged.connect(self._doRotate)
 
-		self._diasshowInterval = 2 # in seconds
 		self._diasshowTimer = QTimer(self)
 		self._diasshowTimer.timeout.connect(self.requestNext)
 
@@ -136,13 +144,14 @@ class Happyview(QGraphicsView):
 		self._mainControls.zoomChanged.connect(self._startZoom)
 		self._mainControls.rotateChanged.connect(self._rotationAnimation.start)
 		self._mainControls.diasshowStateChanged.connect(self.toggleDiasshow)
+		self._mainControls.imageModeChanged.connect(self.setImageMode)
 
 		# connect the nav arrows
 		self._navControls.forwardClicked.connect(self.requestNext)
 		self._navControls.backwardClicked.connect(self.requestPrev)
 
 		self.setScene(self._mainScene)
-		self.setMinimumSize(100, 100)
+		self.setMinimumSize(350, 350)
 		self.setImageMode(ImageMode.FitWidth)
 		self.toggleDirection()
 		self.resize(1000, 600)
@@ -151,26 +160,14 @@ class Happyview(QGraphicsView):
 		self._navControls.ensureEgdes()
 
 	def requestNext(self):
-		""
+		"Attempts to show next image in line"
 		if self._currentGallery:
-			if self._currentPixmap:
-				self._mainScene.removeItem(self._currentGallery.currentImage())
-			item = self._currentGallery.nextImage()
-			if item:
-				self._mainScene.addItem(item)
-				self._currentPixmap = item.pixmap()
-				self.updateView()
+			self._currentGallery.nextImage()
 
 	def requestPrev(self):
-		""
+		"Attempts to show previous image in line"
 		if self._currentGallery:
-			if self._currentPixmap:
-				self._mainScene.removeItem(self._currentGallery.currentImage())
-			item = self._currentGallery.prevImage()
-			if item:
-				self._mainScene.addItem(item)
-				self._currentPixmap = item.pixmap()
-				self.updateView()
+			self._currentGallery.prevImage()
 
 	def centerMiddle(self, rect):
 		""
@@ -184,36 +181,30 @@ class Happyview(QGraphicsView):
 		self._imageAnimation.setFrameRange(_from, _to)
 		self._imageAnimation.start()
 
-	def _moveTo(self, p):
-		""
-		if self._orientation == Qt.Horizontal:
-			self.centerOn(p, self.sceneRect().y())
-		else:
-			self.centerOn(self.sceneRect().x(), p)
-
 	def updateView(self):
 		""
-		if self._currentPixmap:
-			item = self._currentGallery.currentImage()
-			if self._imageMode in (ImageMode.FitInView, ImageMode.FitHeight, ImageMode.FitWidth):
-				# skalerings matrice
-				# [1, 0, 0]
-				# [0, 1, 0]
-				# [0, 0, 1]
-				matrix = QTransform(1,0,0,0,1,0,0,0,1)
+		if self._currentPixmapItem:
+			item = self._currentPixmapItem
+			# skalerings matrice
+			# [1, 0, 0]
+			# [0, 1, 0]
+			# [0, 0, 1]
+			matrix = QTransform(1,0,0,0,1,0,0,0,1)
 
-				xscale = max(1, self.width())/max(1, item.boundingRect().size().width()+2)
-				yscale = max(1, self.height())/max(1, item.boundingRect().size().height()+2)
+			xscale = max(1, self.width())/max(1, item.boundingRect().size().width()+2)
+			yscale = max(1, self.height())/max(1, item.boundingRect().size().height()+2)
 
-				if self._imageMode == ImageMode.FitWidth:
-					yscale = xscale
-				elif self._imageMode == ImageMode.FitHeight:
-					xscale = yscale
-				else:
-					xscale = yscale = min(xscale, yscale)
-				matrix.scale(xscale,yscale)
-				self.setTransform(matrix)
-		self.setSceneRect(item.boundingRect())
+			if self._imageMode == ImageMode.FitWidth:
+				yscale = xscale
+			elif self._imageMode == ImageMode.FitHeight:
+				xscale = yscale
+			elif self._imageMode == ImageMode.FitInView:
+				xscale = yscale = min(xscale, yscale)
+			else:
+				xscale = yscale = 1
+			matrix.scale(xscale,yscale)
+			self.setTransform(matrix)
+			self.setSceneRect(item.boundingRect())
 
 	def load(self, sources):
 		"""
@@ -229,10 +220,13 @@ class Happyview(QGraphicsView):
 		""
 		assert isinstance(g, Gallery)
 		if self._currentGallery:
-			self._mainScene.removeItem(self._currentGallery.currentImage())
-			self._currentPixmap = None
+			self._currentGallery.imageLoaded.disconnect()
+		if self._currentPixmapItem:
+			self._mainScene.removeItem(self._currentPixmapItem)
+			self._currentPixmapItem = None
 
 		self._currentGallery = g
+		g.imageLoaded.connect(self._setItem)
 		self.requestNext()
 
 	def setScalingFactor(self, f):
@@ -252,27 +246,45 @@ class Happyview(QGraphicsView):
 		
 		self._orientation = ori
 
-	def toggleDiasshow(self):
+	def toggleDiasshow(self, secs=5):
 		"Play or Pause the diasshow"
+		print(secs, "secs wtf")
 		if self._diasshowTimer.isActive():
 			self._diasshowTimer.stop()
 		else:
-			self._diasshowTimer.start(self._diasshowInterval*1000)
+			self._diasshowTimer.start(secs*1000)
 
 	def setImageMode(self, mode):
 		""
-		self._imageMode = mode
 		if mode == ImageMode.NativeSize:
+			self._imageMode = ImageMode.NativeSize
 			self.setDragMode(self.ScrollHandDrag)
 		else:
 			self.setDragMode(self.NoDrag)
 
-	def toggleViewMode(self):
-		"Toggle view mode"
-		if self._viewMode == ViewMode.SingleView:
-			self._viewMode = ViewMode.DoubleView
+		if mode == ImageMode.FitInView:
+			self._imageMode = ImageMode.FitInView
+		elif mode == ImageMode.FitWidth:
+			self._imageMode = ImageMode.FitWidth
+		elif mode == ImageMode.FitHeight:
+			self._imageMode = ImageMode.FitHeight
+
+		self.updateView()
+
+	#def toggleViewMode(self):
+	#	"Toggle view mode"
+	#	if self._viewMode == ViewMode.SingleView:
+	#		self._viewMode = ViewMode.DoubleView
+	#	else:
+	#		self._viewMode = ViewMode.SingleView
+
+	def toggleFullscreen(self):
+		"Toggle fullscreen"
+		if self.isFullScreen():
+			self.showNormal()
 		else:
-			self._viewMode = ViewMode.SingleView
+			self.showFullScreen()
+		self.updateView()
 
 	def resizeEvent(self, ev):
 		# center controls
@@ -283,6 +295,15 @@ class Happyview(QGraphicsView):
 
 	def wheelEvent(self, ev):
 		super().wheelEvent(ev)
+
+	def _setItem(self, item):
+		"Recieves a QGraphicsPixmapItem by the Gallery class"
+		if self._currentPixmapItem:
+			self._mainScene.removeItem(self._currentPixmapItem)
+		if item:
+			self._mainScene.addItem(item)
+			self._currentPixmapItem = item
+		self.updateView()
 
 	def _startZoom(self, _in):
 		""
@@ -320,6 +341,25 @@ class Happyview(QGraphicsView):
 		matrix = self.transform()*matrix
 		self.setTransform(matrix)
 
+	def mouseMoveEvent(self, ev):
+		# automatically show maincontrols when near mouse position
+		if self._mainControls.geometry().adjusted(0, 0, 50, 50).contains(ev.pos()):
+			self._mainControls.show()
+		else:
+			self._mainControls.hide()
+
+		# automatically show nav arrows when near mouse position
+		if self._navControls._forward.geometry().contains(ev.pos()):
+			self._navControls._forward.show()
+		else:
+			self._navControls._forward.hide()
+		if self._navControls._backward.geometry().contains(ev.pos()):
+			self._navControls._backward.show()
+		else:
+			self._navControls._backward.hide()
+
+		return super().mouseMoveEvent(ev)
+
 	def mousePressEvent(self, ev):
 		if ev.button() == Qt.LeftButton:
 			if self._canPan:
@@ -331,6 +371,10 @@ class Happyview(QGraphicsView):
 			if self._canPan:
 				self.setDragMode(self.NoDrag)
 		super().mouseReleaseEvent(ev)
+
+	def mouseDoubleClickEvent(self, ev):
+		self.toggleFullscreen()
+		return super().mouseDoubleClickEvent(ev)
 
 if __name__ == '__main__':
 	from PyQt5.QtWidgets import QApplication
