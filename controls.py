@@ -56,7 +56,7 @@ class MainControls(BaseControl):
 		spacer1.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 		self.addWidget(spacer1)
 
-		self.supportedImages = supported_exts
+		self.supportedExts = supported_exts
 		self._fromFile = self.addAction(QIcon("icons/image-outline.svg"), "", self.chooseFile) # load images from file
 		self._fromFile.setToolTip("Load image")
 		self._fromFolder = self.addAction(QIcon("icons/folder-open.svg"), "", self.chooseFolder) # load images from folder
@@ -121,15 +121,18 @@ class MainControls(BaseControl):
 		folder = QFileDialog.getExistingDirectory(self.parentWidget(), "Choose folder")
 		if folder:
 			self.imagesSelected.emit(
-				[os.path.join(folder, x) for x in os.listdir(folder) if x.endswith((".jpg", ".png", ".zip", ".cbz"))])
+				[os.path.join(folder, x) for x in os.listdir(folder) if x.endswith(tuple(self.supportedExts))])
 
 	def chooseFile(self):
-		files, _ = QFileDialog.getOpenFileNames(self.parentWidget(), "Select image", filter=self.supportedImages)
+		exts = ""
+		for i in self.supportedExts:
+			exts += "*"+i+" "   # QFileDialog only accepts a string like this: "*.jpg *.png"
+		files, _ = QFileDialog.getOpenFileNames(self.parentWidget(), "Select image", filter=exts)
 		if files: # if a file was chosen
 			images = []
 			for f in files:
-				if f.endswith((".zip", ".cbz")):
-					continue
+				#if f.endswith((".zip", ".cbz")): 
+				#	continue
 				images.append(f)
 			self.imagesSelected.emit(images)
 
