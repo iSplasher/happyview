@@ -15,10 +15,6 @@ class ReadingDirection(enum.Enum):
 	LeftToRight = 0
 	RightToLeft = 1
 
-class ViewMode(enum.Enum):
-	SingleView = 0
-	DoubleView = 1
-
 class ImageMode(enum.IntEnum):
 	NativeSize = 0
 	FitInView = 1
@@ -110,7 +106,6 @@ class Happyview(QGraphicsView):
 		self._orientation = Qt.Vertical # which way to go for the next image
 		self._readingDirection = ReadingDirection.LeftToRight
 		self._imageMode = None
-		self._viewMode = ViewMode.SingleView
 		self._backgroundColor = "#404244"
 		self._backgroundBrush = QBrush(QColor(self._backgroundColor))
 
@@ -202,18 +197,6 @@ class Happyview(QGraphicsView):
 		if self._currentGallery:
 			self._currentGallery.prevImage()
 
-	def centerMiddle(self, rect):
-		""
-		if self._orientation == Qt.Horizontal:
-			_from = self.sceneRect().x()
-			_to = rect.x() + rect.width()//2
-		else:
-			_from = self.sceneRect().y()
-			r = self._mainScene._middlePix.geometry()
-			_to = rect.y() + rect.height()//2
-		self._imageAnimation.setFrameRange(_from, _to)
-		self._imageAnimation.start()
-
 	def updateView(self):
 		""
 		if self._currentItem:
@@ -300,13 +283,6 @@ class Happyview(QGraphicsView):
 
 		self.updateView()
 
-	#def toggleViewMode(self):
-	#	"Toggle view mode"
-	#	if self._viewMode == ViewMode.SingleView:
-	#		self._viewMode = ViewMode.DoubleView
-	#	else:
-	#		self._viewMode = ViewMode.SingleView
-
 	def toggleFullscreen(self):
 		"Toggle fullscreen"
 		if self.isFullScreen():
@@ -367,36 +343,16 @@ class Happyview(QGraphicsView):
 		matrix = self.transform()*matrix
 		self.setTransform(matrix)
 
-	def _startCrop(self):
-		self._canRubberband = True
-		self._canPan = False
-
-	def _doCrop(self):
-		self.setInteractive(False)
-		self._canRubberband = False
-		self._canPan = True
-		print(self._mainScene.selectionArea().boundingRect())
-		self._mainScene.clearSelection()
-
 	def contextMenuEvent(self, ev):
 		"Contextmenu"
 		if self._currentItem:
 			menu = QMenu(self)
 			menu.addAction("Toggle image info", lambda: self._imageInfo.hide() if self._imageInfo.isVisible() else self._imageInfo.show())
 			menu.addAction("Show in explorer", lambda: subprocess.Popen(r'explorer.exe /select,"{}"'.format(os.path.normcase(self._imagePath.text())), shell=True))
-			menu.addSection("Image Processing")
-			menu.addAction("Crop", self._startCrop)
 			menu.exec(ev.globalPos())
 			ev.accept()
 		else:
 			ev.ignore()
-
-	def keyPressEvent(self, ev):
-		if ev.key() == Qt.Key_Return:
-			if self._canRubberband and not self.rubberBandRect().isNull():
-				print("enter")
-				self._doCrop()
-		return super().keyPressEvent(ev)
 
 	def resizeEvent(self, ev):
 		# center controls
@@ -408,7 +364,7 @@ class Happyview(QGraphicsView):
 		xPos = rect.width()//2-self._imageInfo.width()//2
 		yPos = rect.height()-self._imageInfo.height()*2
 		self._imageInfo.move(xPos, yPos)
-
+		self.updateView()
 		super().resizeEvent(ev)
 
 	def mouseMoveEvent(self, ev):
@@ -438,8 +394,6 @@ class Happyview(QGraphicsView):
 			if self._currentItem:
 				if self._canPan:
 					self.setDragMode(self.ScrollHandDrag)
-				elif self._canRubberband:
-					self.setDragMode(self.RubberBandDrag)
 		super().mousePressEvent(ev)
 
 	def mouseReleaseEvent(self, ev):

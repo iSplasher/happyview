@@ -6,7 +6,7 @@ from PyQt5.QtGui import (QBrush, QColor, QPainter, QPen, QBrush,
 from PyQt5.QtWidgets import (QToolBar, QPushButton, QFileDialog, QWidget,
 							 QSizePolicy, QMenu, QToolButton, QActionGroup)
 
-import zipfile, os
+import os
 
 class Direction(Enum):
 	Forward = 0
@@ -40,7 +40,6 @@ class BaseControl(QToolBar):
 class MainControls(BaseControl):
 	"Main controls for changes general settings"
 	imagesSelected = pyqtSignal(list)
-	#viewModeChanged = pyqtSignal()
 	imageModeChanged = pyqtSignal(int)
 	imageDirectionChanged = pyqtSignal()
 	diasshowStateChanged = pyqtSignal(int)
@@ -129,12 +128,7 @@ class MainControls(BaseControl):
 			exts += "*"+i+" "   # QFileDialog only accepts a string like this: "*.jpg *.png"
 		files, _ = QFileDialog.getOpenFileNames(self.parentWidget(), "Select image", filter=exts)
 		if files: # if a file was chosen
-			images = []
-			for f in files:
-				#if f.endswith((".zip", ".cbz")): 
-				#	continue
-				images.append(f)
-			self.imagesSelected.emit(images)
+			self.imagesSelected.emit(files)
 
 	def ensureDirection(self, ori):
 		""
