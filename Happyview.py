@@ -198,7 +198,7 @@ class Happyview(QGraphicsView):
 			self._currentGallery.prevImage()
 
 	def updateView(self):
-		""
+		"Makes sure the image is transformed"
 		if self._currentItem:
 			item = self._currentItem
 			# skalerings matrice
@@ -233,7 +233,6 @@ class Happyview(QGraphicsView):
 		self.setGallery(g)
 
 	def setGallery(self, g):
-		""
 		assert isinstance(g, Gallery)
 		if self._currentGallery:
 			self._currentGallery.imageLoaded.disconnect()
@@ -246,7 +245,7 @@ class Happyview(QGraphicsView):
 		self.requestNext()
 
 	def setScalingFactor(self, f):
-		""
+		"How much to zoom on each click"
 		self._scalingFactor = f
 
 	def toggleDirection(self):
@@ -271,7 +270,7 @@ class Happyview(QGraphicsView):
 			self._diasshowTimer.start(secs*1000)
 
 	def setImageMode(self, mode):
-		""
+		"Set how the image is shown"
 		if mode == ImageMode.FitInView:
 			self._imageMode = ImageMode.FitInView
 		elif mode == ImageMode.FitWidth:
@@ -308,14 +307,12 @@ class Happyview(QGraphicsView):
 		self.updateView()
 
 	def _startZoom(self, _in):
-		""
 		self._zoomIn = _in
 		if self._zoomAnimation.Running:
 			self._zoomAnimation.stop()
 		self._zoomAnimation.start()
 
 	def _doZoom(self):
-		""
 		self.setTransformationAnchor(self.AnchorViewCenter)
 		if self._zoomIn:
 			zoomScale = 1+self._scalingFactor

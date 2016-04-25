@@ -23,10 +23,6 @@ class BaseControl(QToolBar):
 					 """
 					 background-color: rgba(255, 255, 255, 0.4);
 					 """)
-
-	def centerToolActions(self):
-		""
-		pass
 	@property
 	def halfWidth(self):
 		return self.width() // 2
@@ -117,12 +113,14 @@ class MainControls(BaseControl):
 		self.addWidget(spacer2)
 
 	def chooseFolder(self):
+		"Load images from a folder"
 		folder = QFileDialog.getExistingDirectory(self.parentWidget(), "Choose folder")
 		if folder:
 			self.imagesSelected.emit(
 				[os.path.join(folder, x) for x in os.listdir(folder) if x.endswith(tuple(self.supportedExts))])
 
 	def chooseFile(self):
+		"Load a single image"
 		exts = ""
 		for i in self.supportedExts:
 			exts += "*"+i+" "   # QFileDialog only accepts a string like this: "*.jpg *.png"
@@ -131,7 +129,7 @@ class MainControls(BaseControl):
 			self.imagesSelected.emit(files)
 
 	def ensureDirection(self, ori):
-		""
+		"Makes sure the direction is correct"
 		self.move(0, 0)
 		pSize = self.parentWidget().size()
 		if ori == Qt.Horizontal:
@@ -163,7 +161,7 @@ class NavControl(QPushButton):
 		self.resize(35, 35) # default size
 
 	def paintEvent(self, ev):
-
+		"Paints the arrow"
 		# setup
 
 		rect = self.rect()
